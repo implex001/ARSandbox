@@ -8,7 +8,8 @@ public class Sandbox : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "RHI", "InputCore", "GeometryCore", "ProceduralMeshComponent", "GeometryFramework" });
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", 
+			"CoreUObject", "Engine", "RHI", "InputCore", "GeometryCore", "ProceduralMeshComponent", "GeometryFramework", "OpenCV", "OpenCVHelper" });
 
 		PrivateDependencyModuleNames.AddRange(new string[] { "Kinect"});
 

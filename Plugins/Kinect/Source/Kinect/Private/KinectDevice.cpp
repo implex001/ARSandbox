@@ -94,7 +94,7 @@ void UKinectDevice::LoadDefault()
 
 	SAFE_DELETE_ARRAY(DepthDistortionMap);
 	DepthDistortionMap = new(std::nothrow) DepthSpacePoint[DepthImagePixels];
-	if (nullptr == DepthDistortionLT)
+	if (nullptr == DepthDistortionMap)
 	{
 		UE_LOG(KinectDeviceLog, Error, TEXT("Failed to initialize Kinect Fusion depth image distortion map."));
 	}
@@ -287,9 +287,17 @@ void UKinectDevice::ProcessDepth(UINT16* buffer, UINT size)
 	{
 		// Get the depth for this pixel
 		uint16 Depth = static_cast<uint16>(rawOutput[i]);
-		DepthData[i] = static_cast<int>((Depth - min) / (min - max));
+		if (Depth == 2048U)
+		{
+			Depth = static_cast<uint16>(max);
+		}
+		DepthData[i] = static_cast<int>((Depth - min) / (max - min));
 
-		uint8 Intensity = static_cast<uint8>((Depth - min) / (min - max) * 255);
+		uint8 Intensity = 255 - static_cast<uint8>((Depth - min) / (max - min) * 255);
+		if (Intensity == 74)
+		{
+			Intensity = 255;
+		}
 
 		ColorSpacePoint colorPoint = ColorSpacePoints[i];
 		const int colorX = static_cast<int>(colorPoint.X);

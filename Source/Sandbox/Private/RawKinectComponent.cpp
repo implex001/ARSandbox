@@ -3,6 +3,8 @@
 
 #include "Sandbox/Public/RawKinectComponent.h"
 
+#include "Async/IAsyncTask.h"
+
 // Sets default values for this component's properties
 URawKinectComponent::URawKinectComponent()
 {
@@ -42,9 +44,20 @@ void URawKinectComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void URawKinectComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	// if (FirstLaunch == true)
+	// {
+	// 	FirstLaunch = false;
+	// 	AsyncTask(ENamedThreads::GameThread, [this]() {
+	// 		KinectDevice->Update();
+	// 		FirstLaunch = true;
+	// 	});
+	// }
+	AsyncTask(ENamedThreads::GameThread, [this]() {
 	KinectDevice->Update();
+	FirstLaunch = true;
+});
 
 	
-	// ...
 }
 
