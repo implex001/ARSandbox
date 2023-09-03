@@ -24,6 +24,9 @@ KinectSensor(nullptr)
 	DepthImage = UTexture2D::CreateTransient(DepthWidth, DepthHeight);
 	DepthData.Init(0, DepthImagePixels + 5);
 
+	ColorWidth = COLOR_RAW_WIDTH;
+	ColorHeight = COLOR_RAW_HEIGHT;
+
 	ColorImage = UTexture2D::CreateTransient(COLOR_RAW_WIDTH, COLOR_RAW_HEIGHT);
 	ColorImagePixelBuffer.Init(0, COLOR_RAW_WIDTH * COLOR_RAW_HEIGHT * 4);
 
@@ -109,8 +112,10 @@ void UKinectDevice::LoadDefault()
 		UE_LOG(KinectDeviceLog, Error, TEXT("Failed to initialize Kinect Fusion depth image distortion Lookup Table."));
 	}
 
+	ColorSpacePoints.Init(ColorSpacePoint(), DepthImagePixels);
+	DepthSpacePoints.Init(DepthSpacePoint(), COLOR_RAW_WIDTH*COLOR_RAW_HEIGHT);
+
 	OnCoordinateMappingChanged();
-	
 	
 }
 
@@ -177,11 +182,10 @@ void UKinectDevice::Update()
 	{
 		UINT nBufferSize = 0;
 		UINT8 *pBuffer = NULL;
-
-		// Assumes data is in rgba format
+		
 		//pColorFrame->AccessRawUnderlyingBuffer(&nBufferSize, &pBuffer);
 		hr = pColorFrame->CopyConvertedFrameDataToArray(COLOR_RAW_WIDTH*COLOR_RAW_HEIGHT*4, ColorImagePixelBuffer.GetData(), ColorImageFormat_Bgra);
-	
+		
 		if (FAILED(hr))
 		{
 			UE_LOG(KinectDeviceLog, Error, TEXT("Failed to acquire color frame: %ld"), hr);
@@ -243,7 +247,6 @@ void UKinectDevice::ProcessColor(UINT8* buffer, UINT size)
 	ColorImage->UpdateResource();
 }
 
-
 /// <summary>
 /// Handle new depth data 
 /// </summary>
@@ -272,11 +275,9 @@ void UKinectDevice::ProcessDepth(UINT16* buffer, UINT size)
 	float min = static_cast<float>(MinDepthDistance);
 	float max = static_cast<float>(MaxDepthDistance);
 
-	// Map Raw depth points to color space
-	TArray<ColorSpacePoint> ColorSpacePoints;
-	ColorSpacePoints.Init(ColorSpacePoint(), DepthImagePixels);
+	// Map Raw depth points to color spac
 	Mapper->MapDepthFrameToColorSpace(DepthImagePixels, buffer, DepthImagePixels, ColorSpacePoints.GetData());
-
+	Mapper->MapColorFrameToDepthSpace(DepthImagePixels, buffer, COLOR_RAW_WIDTH*COLOR_RAW_HEIGHT, DepthSpacePoints.GetData());
 	FTexturePlatformData* platformData = DepthImage->GetPlatformData();
 	FTexture2DMipMap* MipMap = &platformData->Mips[0];
 	FByteBulkData* ImageData = &MipMap->BulkData;

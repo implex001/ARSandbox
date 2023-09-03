@@ -45,18 +45,18 @@ void URawKinectComponent::TickComponent(float DeltaTime, ELevelTick TickType, FA
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	// if (FirstLaunch == true)
-	// {
-	// 	FirstLaunch = false;
-	// 	AsyncTask(ENamedThreads::GameThread, [this]() {
-	// 		KinectDevice->Update();
-	// 		FirstLaunch = true;
-	// 	});
-	// }
-	AsyncTask(ENamedThreads::GameThread, [this]() {
-	KinectDevice->Update();
-	FirstLaunch = true;
-});
+	if (FirstLaunch == true)
+	{
+		FirstLaunch = false;
+		AsyncTask(ENamedThreads::GameThread, [this]() {
+			KinectDevice->Update();
+			FirstLaunch = true;
+		});
+	}
+// 	AsyncTask(ENamedThreads::GameThread, [this]() {
+// 	KinectDevice->Update();
+// 	FirstLaunch = true;
+// });
 
 	
 }

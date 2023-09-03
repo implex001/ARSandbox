@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "OpenCVBlueprintFunctionLibrary.h"
+#include "RawKinectComponent.h"
 #include "Components/ActorComponent.h"
 #include "AsyncArucoComponent.generated.h"
 
@@ -18,7 +19,7 @@ public:
 	UAsyncArucoComponent();
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	UTextureRenderTarget2D* RenderTargetIn;
+	URawKinectComponent* RawKinectComponent;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	EOpenCVArucoDictionary InDictionary;
@@ -43,6 +44,9 @@ public:
 
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
 	TArray<FOpenCVArucoDetectedMarker> OutDetectedMarkers;
+	
+	UFUNCTION(BlueprintCallable)
+	void ConvertMarkerToDepthSpace(TArray<FOpenCVArucoDetectedMarker> InMarkers, TArray<FOpenCVArucoDetectedMarker>& OutMarkers); 
 
 protected:
 	// Called when the game starts
@@ -55,6 +59,7 @@ protected:
 public:	
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+
 private:
 	int32 OpenCVArucoDetectMarkers(const FIntPoint Size);
 

@@ -60,6 +60,12 @@ public:
 	UPROPERTY(BlueprintReadOnly)
 	int Height;
 
+	UPROPERTY(BlueprintReadOnly)
+	int ColorWidth;
+
+	UPROPERTY(BlueprintReadOnly)
+	int ColorHeight;
+
 
 private:
 
@@ -81,14 +87,18 @@ private:
 	UINT16* DepthImagePixelBuffer;
 	
 	IColorFrameReader* ColorFrameReader;
+public:
 	TArray<uint8> ColorImagePixelBuffer;
+	TArray<ColorSpacePoint> ColorSpacePoints;
+	TArray<DepthSpacePoint> DepthSpacePoints;
+private:
 
 	IMultiSourceFrameReader* MultiSourceFrameReader;
 
 	// For filtering
 	FrameFilter* Filter;
 	
-	//For depth distortion correction
+	//For depth distortion correction and coordinate mapping
 	ICoordinateMapper* Mapper;
 	DepthSpacePoint* DepthDistortionMap;
 	UINT* DepthDistortionLT;

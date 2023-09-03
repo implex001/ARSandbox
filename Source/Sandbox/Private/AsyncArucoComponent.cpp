@@ -38,6 +38,7 @@ void UAsyncArucoComponent::BeginPlay()
 	OutTexture = UTexture2D::CreateTransient(1, 1, PF_B8G8R8A8);
 	OutDetectedMarkers = TArray<FOpenCVArucoDetectedMarker>();
 	InLensDistortionParameters = FOpenCVLensDistortionParametersBase();
+	Pixels.AddDefaulted(1920*1080);
 }
 
 
@@ -49,16 +50,15 @@ void UAsyncArucoComponent::TickComponent(float DeltaTime, ELevelTick TickType, F
 	if (FirstRun == true)
 	{
 		FirstRun = false;
-		OutDetectedMarkers.Empty();
-		FIntPoint size = ReadRenderTarget(RenderTargetIn);
-		AsyncTask(ENamedThreads::AnyBackgroundHiPriTask, [this, size]()
+		
+		AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this]()
 		{
-			OpenCVArucoDetectMarkers(size);
+			FMemory::Memcpy(Pixels.GetData(),
+				RawKinectComponent->KinectDevice->ColorImagePixelBuffer.GetData(), Pixels.Num() * sizeof(FColor));
+			OpenCVArucoDetectMarkers(FIntPoint(1920,1080));
 			FirstRun = true;
 		});
 	}
-
-	// Draw Rain Location
 }
 
 FIntPoint UAsyncArucoComponent::ReadRenderTarget(const UTextureRenderTarget2D* InRenderTarget)
@@ -117,8 +117,9 @@ int32 UAsyncArucoComponent::OpenCVArucoDetectMarkers(const FIntPoint Size)
 
 	// Create OpenCV Mat with those pixels and convert to grayscale for image processing
 	cv::Mat CvFrameColor(cv::Size(Size.X, Size.Y), CV_8UC4, Pixels.GetData());
+	cv::flip(CvFrameColor, CvFrameColor, 1);
 	cv::Mat CvFrameGray;
-	cv::cvtColor(CvFrameColor, CvFrameGray, cv::COLOR_RGBA2GRAY);
+	cv::cvtColor(CvFrameColor, CvFrameGray, cv::COLOR_BGRA2GRAY);
 
 	// Select the requested marker dictionary
 	cv::aruco::PREDEFINED_DICTIONARY_NAME DictionaryName = cv::aruco::DICT_ARUCO_ORIGINAL;
@@ -222,7 +223,8 @@ int32 UAsyncArucoComponent::OpenCVArucoDetectMarkers(const FIntPoint Size)
 		}
 
 		// Copy the OpenCV data into the Unreal types for return
-		OutDetectedMarkers.Reserve(NumMarkersFound);
+		TArray<FOpenCVArucoDetectedMarker> markers;
+		markers.Reserve(NumMarkersFound);
 		for (int32 Index = 0; Index < NumMarkersFound; Index++)
 		{
 			FOpenCVArucoDetectedMarker NewMarker;
@@ -259,10 +261,11 @@ int32 UAsyncArucoComponent::OpenCVArucoDetectMarkers(const FIntPoint Size)
 			}
 
 			NewMarker.Pose = NewPose;
-			OutDetectedMarkers.Add(NewMarker);
+			markers.Add(NewMarker);
 		}
+		OutDetectedMarkers = markers;
 	}
-
+	
 	return NumMarkersFound;
 }
 #else
@@ -271,4 +274,30 @@ int32 UAsyncArucoComponent::OpenCVArucoDetectMarkers(const FIntPoint Size)
 		return 0;
 	}
 #endif	// WITH_OPENCV
+
+void UAsyncArucoComponent::ConvertMarkerToDepthSpace(TArray<FOpenCVArucoDetectedMarker> InMarkers, TArray<FOpenCVArucoDetectedMarker>& OutMarkers)
+{
+	int width = RawKinectComponent->KinectDevice->Width;
+	int height = RawKinectComponent->KinectDevice->Height;
+
+	int colorWidth = RawKinectComponent->KinectDevice->ColorWidth;
+	int colorHeight = RawKinectComponent->KinectDevice->ColorHeight;
+
+	OutMarkers.Reserve(InMarkers.Num());
+	for(FOpenCVArucoDetectedMarker marker : InMarkers)
+	{
+		for (int i = 0; i < marker.Corners.Num(); i++)
+		{
+			float cornerX = (1 - marker.Corners[i].X) * colorWidth;
+			float cornerY = marker.Corners[i].Y * colorHeight;
+			DepthSpacePoint depthSpacePoint = RawKinectComponent->KinectDevice->DepthSpacePoints[floor(cornerX + cornerY * colorWidth)];
+			if (depthSpacePoint.X > 0 && depthSpacePoint.Y > 0)
+			{
+				marker.Corners[i] = FVector2D(1 - (depthSpacePoint.X / width), depthSpacePoint.Y / height);
+			}
+		}
+		OutMarkers.Add(marker);
+	}
+}
+
 
