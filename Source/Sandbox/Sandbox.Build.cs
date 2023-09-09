@@ -11,7 +11,7 @@ public class Sandbox : ModuleRules
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", 
 			"CoreUObject", "Engine", "RHI", "InputCore", "GeometryCore", "ProceduralMeshComponent", "GeometryFramework", "OpenCV", "OpenCVHelper" });
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "Kinect"});
+		PrivateDependencyModuleNames.AddRange(new string[] { "Kinect", "GeometryScriptingCore" });
 
 		// Uncomment if you are using Slate UI
 		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });

@@ -1,16 +1,53 @@
-﻿#include "UFireSim.h"
+﻿#include "UCheneyFireSimComponent.h"
 
+#include "GeometryScript/TextureMapFunctions.h"
 
-UFireSim::~UFireSim()
+UCheneyFireSimComponent::UCheneyFireSimComponent()
 {
+	PrimaryComponentTick.bCanEverTick = false;
 }
 
-double UFireSim::GetSpeed(FGrid<double>& Grid, FIntVector2 Coordinate, FVector2d AdvectNormalVector)
+void UCheneyFireSimComponent::BeginPlay()
 {
-	return 1.0;
+	Super::BeginPlay();
 }
 
-double UCheneyFireSim::GetSpeed(FGrid<double>& Grid, FIntVector2 Coordinate, FVector2d AdvectNormalVector)
+void UCheneyFireSimComponent::TickComponent(float DeltaTime, ELevelTick TickType,
+	FActorComponentTickFunction* ThisTickFunction)
+{
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	if (DepthTexture != nullptr)
+	{
+		for(int i = 0; i < SimSize.X; i++)
+		{
+			for(int j = 0; j < SimSize.Y; j++)
+			{
+				FGeometryScriptUVList UVList = FGeometryScriptUVList();
+				UVList.List->Add(FVector2D(i, j));
+				FGeometryScriptSampleTextureOptions Options = FGeometryScriptSampleTextureOptions();
+				FGeometryScriptColorList ColorList = FGeometryScriptColorList();
+				UGeometryScriptLibrary_TextureMapFunctions::SampleTexture2DAtUVPositions(UVList, DepthTexture, Options, ColorList);
+				DepthGrid[i * SimSize.Y + j] = ColorList.List->operator[](0).A;
+			}
+		}
+	}
+}
+
+void UCheneyFireSimComponent::DefaultSetUp(FVector2D wind, EChenySubclass Subclass, double Temp, double Humidity, double curing, FVector2D size)
+{
+	WindVector = wind;
+	temperature = Temp;
+	rel_hum = Humidity;
+
+	CuringGrid.Init(curing, size.X * size.Y);
+	SubclassGrid.Init(Subclass, size.X * size.Y);
+	DepthGrid.Init(0, size.X * size.Y);
+
+	SimSize = FIntVector2(size.X, size.Y);
+}
+
+double UCheneyFireSimComponent::GetSpeed(FGrid<double>& Grid, FIntVector2 Coordinate, FVector2d AdvectNormalVector)
 {
 	// // CSIRO grasslands models - Cheney et al. (1998)
 
@@ -66,7 +103,7 @@ double UCheneyFireSim::GetSpeed(FGrid<double>& Grid, FIntVector2 Coordinate, FVe
 
 	// Calculate curing coefficient from Cruz et al. (2015)
 	float curing_coeff;
-	float curing = CuringGrid[Coordinate.X][Coordinate.Y];
+	float curing = CuringGrid[Coordinate.Y + Coordinate.X * Grid.Size.Y];
 	if (curing < 20)
 		curing_coeff = 0;
 	else
@@ -98,7 +135,7 @@ double UCheneyFireSim::GetSpeed(FGrid<double>& Grid, FIntVector2 Coordinate, FVe
 	float CF_Wind_Fast;
 	float speed_factor = 1;
 
-	int subclass = SubclassGrid[Coordinate.X][Coordinate.Y];
+	int subclass = SubclassGrid[Coordinate.Y + Coordinate.X * Grid.Size.Y];
 
 	if (subclass == 1) // Eaten out
 	{
@@ -150,5 +187,61 @@ double UCheneyFireSim::GetSpeed(FGrid<double>& Grid, FIntVector2 Coordinate, FVe
 	head_speed = head_speed * speed_factor;
 
 	// Adjust for calculated speed coefficient for fire flanks
-	return head_speed * speed_fraction;
+	double speed = head_speed * speed_fraction;
+
+	FVector2d gradient_elevation = CalculateGradient(DepthGrid, Coordinate, Grid.Size);
+	double slope_in_normal = atan(FVector2d::DotProduct(AdvectNormalVector, gradient_elevation));
+	slope_in_normal = FMath::Min(FMath::Max(slope_in_normal, -20), 20);
+	double slope_cooefficient = FMath::Exp(0.069 * slope_in_normal);
+	return speed * slope_cooefficient;
+}
+
+FVector2D UCheneyFireSimComponent::CalculateGradient(TArray<int>& Grid, FIntVector2 Coordinate, FIntVector2 Bounds)
+{
+	int x = Coordinate.X;
+	int y = Coordinate.Y;
+
+	double grid_x_minus;
+	double grid_x_plus;
+	double grid_y_minus;
+	double grid_y_plus;
+	
+	if (x == 0)
+	{
+		grid_x_minus = Grid[x * Bounds.Y + y];
+	} else
+	{
+		grid_x_minus = Grid[(x - 1) * Bounds.Y + y];
+	}
+
+	if (x == Bounds.X - 1)
+	{
+		grid_x_plus = Grid[x * Bounds.Y + y];
+	}
+	else
+	{
+		grid_x_plus = Grid[(x + 1) * Bounds.Y + y];
+	}
+
+	if (y == 0)
+	{
+		grid_y_minus = Grid[x * Bounds.Y + y];
+	}
+	else
+	{
+		grid_y_minus = Grid[x * Bounds.Y + (y - 1)];
+	}
+
+	if (y == Bounds.Y - 1)
+	{
+		grid_y_plus = Grid[x * Bounds.Y + y];
+	}
+	else
+	{
+		grid_y_plus = Grid[x * Bounds.Y + (y + 1)];
+	}
+
+	double grid_x = (grid_x_plus - grid_x_minus);
+	double grid_y = (grid_y_plus - grid_y_minus);
+	return FVector2D(grid_x, grid_y);
 }

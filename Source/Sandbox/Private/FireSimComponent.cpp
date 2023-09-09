@@ -9,7 +9,7 @@ UFireSimComponent::UFireSimComponent()
 	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
 	// off to improve performance if you don't need them.
 	PrimaryComponentTick.bCanEverTick = true;
-
+	FireTexture = UTexture2D::CreateTransient(SimulationSize.X, SimulationSize.Y);
 	// ...
 }
 
@@ -18,8 +18,10 @@ UFireSimComponent::UFireSimComponent()
 void UFireSimComponent::BeginPlay()
 {
 	Super::BeginPlay();
-	PhiGrid = FGrid<double>(SimulationSize.X, SimulationSize.X);
-	TempPhiGrid = FGrid<double>(SimulationSize.X, SimulationSize.X);
+	ResetSimulation();
+	InitDistanceGrid(PhiGrid);
+	FireTexture = UTexture2D::CreateTransient(SimulationSize.X, SimulationSize.Y);
+	ConvertToTexture(PhiGrid);
 }
 
 
@@ -31,6 +33,29 @@ void UFireSimComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAct
 	// ...
 }
 
+void UFireSimComponent::StepSimulation()
+{
+	Time++;
+	if (Time % ReInitializeStep == 0)
+	{
+		InitDistanceGrid(PhiGrid);
+	}
+	TimeStep(PhiGrid);
+	ConvertToTexture(PhiGrid);
+}
+
+void UFireSimComponent::RefreshGrid()
+{
+	InitDistanceGrid(PhiGrid);
+}
+
+void UFireSimComponent::ResetSimulation()
+{
+	PhiGrid = FGrid<double>(0, SimulationSize.X, SimulationSize.Y);
+	TempPhiGrid = FGrid<double>(0, SimulationSize.X, SimulationSize.Y);
+}
+
+
 void UFireSimComponent::InitDistanceGrid(FGrid<double>& Grid)
 {
 	int error = INT_MAX;
@@ -38,16 +63,16 @@ void UFireSimComponent::InitDistanceGrid(FGrid<double>& Grid)
 	{
 		error = 0;
 		TempPhiGrid = Grid;
-		for (int i = 0; i < Grid.Rows(); i++)
+		for (int i = 0; i < Grid.Size.X; i++)
 		{
-			for (int j = 0; j < Grid[i].Num(); j++)
+			for (int j = 0; j < Grid.Size.Y; j++)
 			{
-				if (Grid[i][j] < 0 || InterfaceLocations.Contains(FVector2D(i,j)))
+				if (Grid.Get(i, j) < 0 || InterfaceLocations.Contains(FVector2D(i,j)))
 					continue;
 
 				double difference = CellInitStep(TempPhiGrid, FIntVector2(i, j));
 				error += difference;
-				Grid[i][j] += difference;
+				Grid.Get(i, j) += difference;
 			}
 		}
 	}
@@ -56,11 +81,11 @@ void UFireSimComponent::InitDistanceGrid(FGrid<double>& Grid)
 void UFireSimComponent::TimeStep(FGrid<double>& Grid)
 {
 	TempPhiGrid = Grid;
-	for (int i = 0; i < Grid.Rows(); i++)
+	for (int i = 0; i < Grid.Size.X; i++)
 	{
-		for (int j = 0; j < Grid[i].Num(); j++)
+		for (int j = 0; j < Grid.Size.Y; j++)
 		{
-			Grid[i][j] = CellTimeStep(TempPhiGrid, FIntVector2(i, j), 1);
+			Grid.Get(i, j) = CellTimeStep(TempPhiGrid, FIntVector2(i, j), SimStepSize);
 		}
 	}
 }
@@ -80,18 +105,9 @@ double UFireSimComponent::ChangeInPhi(FGrid<double>& Grid, FIntVector2 Coordinat
 	return -(Simulation->GetSpeed(Grid, Coordinate, NormalizePhi(Grid, Coordinate)) * MagnitudePhi(Grid, Coordinate, 2));
 }
 
-double UFireSimComponent::CalculateWind(FGrid<double>& Grid, FIntVector2 Coordinate)
-{
-	FVector2d normal = NormalizePhi(Grid, Coordinate);
-	double product =  FVector2D::DotProduct(normal, WindVector);
-	if (product <= 0)
-		return 0;
-	return product;
-}
-
 double UFireSimComponent::RunEulerMethod(FGrid<double>& Grid, FIntVector2 Coordinate, double StepSize)
 {
-	return ChangeInPhi(Grid, Coordinate) * StepSize + Grid[Coordinate[0]][Coordinate[1]];
+	return ChangeInPhi(Grid, Coordinate) * StepSize + Grid[Coordinate];
 }
 
 FVector2d UFireSimComponent::GradientPhi(FGrid<double>& Grid, FIntVector2 Coordinate, double Unit)
@@ -105,13 +121,11 @@ FVector2d UFireSimComponent::GradientPhi(FGrid<double>& Grid, FIntVector2 Coordi
 
 double UFireSimComponent::MagnitudePhi(FGrid<double>& Grid, FIntVector2 Coordinate, double Unit)
 {
-	int x = Coordinate.X;
-	int y = Coordinate.Y;
 	BoundsProbe probe = ProbeBounds(Grid, Coordinate);
-	double grid_x1 = (Grid[x][y] - probe.grid_x_minus) / Unit;
-	double grid_x2 = (Grid[x][y] - probe.grid_x_plus) / Unit;
-	double grid_y1 = (Grid[x][y] - probe.grid_y_minus) / Unit;
-	double grid_y2 = (Grid[x][y] - probe.grid_y_plus) / Unit;
+	double grid_x1 = (Grid[Coordinate] - probe.grid_x_minus) / Unit;
+	double grid_x2 = (Grid[Coordinate] - probe.grid_x_plus) / Unit;
+	double grid_y1 = (Grid[Coordinate] - probe.grid_y_minus) / Unit;
+	double grid_y2 = (Grid[Coordinate] - probe.grid_y_plus) / Unit;
 
 	double dx = FMath::Max3(grid_x1, grid_x2, 0.0);
 	double dy = FMath::Max3(grid_y1, grid_y2, 0.0);
@@ -137,39 +151,74 @@ BoundsProbe UFireSimComponent::ProbeBounds(FGrid<double>& Grid, FIntVector2 Coor
 	
 	if (x == 0)
 	{
-		probe.grid_x_minus = Grid[x][y];
+		probe.grid_x_minus = Grid[Coordinate];
 	} else
 	{
-		probe.grid_x_minus = Grid[x - 1][y];
+		probe.grid_x_minus = Grid.Get(x - 1, y);
 	}
 
-	if (x == SimulationSize[0])
+	if (x == Grid.GetSize()[0] - 1)
 	{
-		probe.grid_x_plus = Grid[x][y];
+		probe.grid_x_plus = Grid[Coordinate];
 	}
 	else
 	{
-		probe.grid_x_plus = Grid[x + 1][y];
+		probe.grid_x_plus = Grid.Get(x + 1, y);
 	}
 
 	if (y == 0)
 	{
-		probe.grid_y_minus = Grid[x][y];
+		probe.grid_y_minus = Grid[Coordinate];
 	}
 	else
 	{
-		probe.grid_y_minus = Grid[x][y - 1];
+		probe.grid_y_minus = Grid.Get(x, y - 1);
 	}
 
-	if (y == SimulationSize[1])
+	if (y == Grid.GetSize()[1] - 1)
 	{
-		probe.grid_y_plus = Grid[x][y];
+		probe.grid_y_plus = Grid[Coordinate];
 	}
 	else
 	{
-		probe.grid_y_plus = Grid[x][y + 1];
+		probe.grid_y_plus = Grid.Get(x, y + 1);
 	}
 	
 	return probe;
+}
+
+void UFireSimComponent::ConvertToTexture(FGrid<double>& Grid)
+{
+	FTexturePlatformData* platformData = FireTexture->GetPlatformData();
+	FTexture2DMipMap* MipMap = &platformData->Mips[0];
+	FByteBulkData* ImageData = &MipMap->BulkData;
+	uint8* RawImageData = (uint8*)ImageData->Lock(LOCK_READ_WRITE);
+
+	for (int i = 0; i < Grid.Size.X; i++)
+	{
+		for (int j = 0; j < Grid.Size.Y; j++)
+		{
+			const int index = (j * Grid.Size.X + i) * 4;
+			const double fire = Grid.Get(i,j);
+			if (fire <= 0)
+			{
+				RawImageData[index] = 0;
+				RawImageData[index + 1] = 0;
+				RawImageData[index + 2] = 255;
+				RawImageData[index + 3] = 255;
+			} else
+			{
+				RawImageData[index] = 0;
+				RawImageData[index + 1] = 0;
+				RawImageData[index + 2] = 0;
+				RawImageData[index + 3] = 255;
+			}
+
+		}
+	}
+	
+	//release the lock
+	ImageData->Unlock();
+	FireTexture->UpdateResource();
 }
 

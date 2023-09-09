@@ -3,9 +3,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UFireSim.h"
 #include "Components/ActorComponent.h"
 #include "FGrid.h"
+#include "UBasicFireSimComponent.h"
 
 #include "FireSimComponent.generated.h"
 
@@ -33,12 +33,16 @@ public:
 	TArray<FVector2D> InterfaceLocations;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FVector2D WindVector;
+	UBasicFireSimComponent* Simulation;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	UFireSim* Simulation;
+	float SimStepSize;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int ReInitializeStep;
 	
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
+	UTexture2D* FireTexture;
 
 protected:
 	// Called when the game starts
@@ -48,22 +52,34 @@ public:
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
+	UFUNCTION(BlueprintCallable)
+	void StepSimulation();
+
+	UFUNCTION(BlueprintCallable)
+	void RefreshGrid();
+
+	UFUNCTION(BlueprintCallable)
+	void ResetSimulation();
 private:
 	const float SteadyThreshold = 0.01f;
 	FGrid<double> PhiGrid;
 	FGrid<double> TempPhiGrid;
+
+	int Time;
 
 	void InitDistanceGrid(FGrid<double>& Grid);
 	void TimeStep(FGrid<double>& Grid);
 	double CellInitStep(FGrid<double>& Grid, FIntVector2 Coordinate);
 	double CellTimeStep(FGrid<double>& Grid, FIntVector2 Coordinate, double StepSize);
 	double ChangeInPhi(FGrid<double>& Grid, FIntVector2 Coordinate);
-	double CalculateWind(FGrid<double>& Grid, FIntVector2 Coordinate);
 	double RunEulerMethod(FGrid<double>& Grid, FIntVector2 Coordinate, double StepSize);
-	FVector2d GradientPhi(FGrid<double>& Grid, FIntVector2 Coordinate, double Unit = 1);
-	double MagnitudePhi(FGrid<double>& Grid, FIntVector2 Coordinate, double Unit = 1);
-	FVector2d NormalizePhi(FGrid<double>& Grid, FIntVector2 Coordinate, double Unit = 1);
-	BoundsProbe ProbeBounds(FGrid<double>& Grid, FIntVector2 Coordinate);
+
+	void ConvertToTexture(FGrid<double>& Grid);
+public:
+	static FVector2d GradientPhi(FGrid<double>& Grid, FIntVector2 Coordinate, double Unit = 1);
+	static double MagnitudePhi(FGrid<double>& Grid, FIntVector2 Coordinate, double Unit = 1);
+	static FVector2d NormalizePhi(FGrid<double>& Grid, FIntVector2 Coordinate, double Unit = 1);
+	static BoundsProbe ProbeBounds(FGrid<double>& Grid, FIntVector2 Coordinate);
 };
 
 

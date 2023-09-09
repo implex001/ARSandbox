@@ -3,18 +3,26 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "UObject/Object.h"
+#include "FGrid.h"
 #include "Components/ActorComponent.h"
-#include "CheneyFireComponent.generated.h"
+#include "UBasicFireSimComponent.Generated.h"
 
-
+/**
+ * 
+ */
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
-class SANDBOX_API UCheneyFireComponent : public UActorComponent
+class SANDBOX_API UBasicFireSimComponent : public UActorComponent
 {
-	GENERATED_BODY()
 
-public:	
-	// Sets default values for this component's properties
-	UCheneyFireComponent();
+	GENERATED_BODY()
+	
+public:
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector2D WindVector;
+	
+	UBasicFireSimComponent();
 
 protected:
 	// Called when the game starts
@@ -24,5 +32,7 @@ public:
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
-		
+	virtual double GetSpeed(FGrid<double>& Grid, FIntVector2 Coordinate, FVector2d AdvectNormalVector);
+private:
+	double CalculateWind(FVector2D normal);
 };
