@@ -14,7 +14,7 @@ public class Sandbox : ModuleRules
 		PrivateDependencyModuleNames.AddRange(new string[] { "Kinect", "GeometryScriptingCore" });
 
 		// Uncomment if you are using Slate UI
-		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore", "UMG" });
 		
 		// Uncomment if you are using online features
 		// PrivateDependencyModuleNames.Add("OnlineSubsystem");
