@@ -18,15 +18,14 @@ UFireSimComponent::UFireSimComponent()
 void UFireSimComponent::BeginPlay()
 {
 	Super::BeginPlay();
-	ResetSimulation();
-	InitDistanceGrid(PhiGrid);
 	FireTexture = UTexture2D::CreateTransient(SimulationSize.X, SimulationSize.Y);
-	ConvertToTexture(PhiGrid);
+	ResetSimulation();
 }
 
 
 // Called every frame
-void UFireSimComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+void UFireSimComponent::TickComponent(float DeltaTime, ELevelTick TickType,
+                                      FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
@@ -47,12 +46,15 @@ void UFireSimComponent::StepSimulation()
 void UFireSimComponent::RefreshGrid()
 {
 	InitDistanceGrid(PhiGrid);
+	ConvertToTexture(PhiGrid);
 }
 
 void UFireSimComponent::ResetSimulation()
 {
 	PhiGrid = FGrid<double>(0, SimulationSize.X, SimulationSize.Y);
 	TempPhiGrid = FGrid<double>(0, SimulationSize.X, SimulationSize.Y);
+	InitDistanceGrid(PhiGrid);
+	ConvertToTexture(PhiGrid);
 }
 
 
@@ -67,7 +69,7 @@ void UFireSimComponent::InitDistanceGrid(FGrid<double>& Grid)
 		{
 			for (int j = 0; j < Grid.Size.Y; j++)
 			{
-				if (Grid.Get(i, j) < 0 || InterfaceLocations.Contains(FVector2D(i,j)))
+				if (Grid.Get(i, j) < 0 || InterfaceLocations.Contains(FVector2D(i, j)))
 					continue;
 
 				double difference = CellInitStep(TempPhiGrid, FIntVector2(i, j));
@@ -102,7 +104,8 @@ double UFireSimComponent::CellTimeStep(FGrid<double>& Grid, FIntVector2 Coordina
 
 double UFireSimComponent::ChangeInPhi(FGrid<double>& Grid, FIntVector2 Coordinate)
 {
-	return -(Simulation->GetSpeed(Grid, Coordinate, NormalizePhi(Grid, Coordinate)) * MagnitudePhi(Grid, Coordinate, 2));
+	return -(Simulation->GetSpeed(Grid, Coordinate, NormalizePhi(Grid, Coordinate)) *
+		MagnitudePhi(Grid, Coordinate, 2));
 }
 
 double UFireSimComponent::RunEulerMethod(FGrid<double>& Grid, FIntVector2 Coordinate, double StepSize)
@@ -148,11 +151,12 @@ BoundsProbe UFireSimComponent::ProbeBounds(FGrid<double>& Grid, FIntVector2 Coor
 	int x = Coordinate.X;
 	int y = Coordinate.Y;
 	BoundsProbe probe;
-	
+
 	if (x == 0)
 	{
 		probe.grid_x_minus = Grid[Coordinate];
-	} else
+	}
+	else
 	{
 		probe.grid_x_minus = Grid.Get(x - 1, y);
 	}
@@ -183,38 +187,68 @@ BoundsProbe UFireSimComponent::ProbeBounds(FGrid<double>& Grid, FIntVector2 Coor
 	{
 		probe.grid_y_plus = Grid.Get(x, y + 1);
 	}
-	
+
 	return probe;
 }
 
 void UFireSimComponent::ConvertToTexture(FGrid<double>& Grid)
 {
+	const double max = FGenericPlatformMath::Max(Grid.Grid);
+	const double min = FGenericPlatformMath::Min(Grid.Grid);
 	FTexturePlatformData* platformData = FireTexture->GetPlatformData();
 	FTexture2DMipMap* MipMap = &platformData->Mips[0];
 	FByteBulkData* ImageData = &MipMap->BulkData;
 	uint8* RawImageData = (uint8*)ImageData->Lock(LOCK_READ_WRITE);
-
-	for (int i = 0; i < Grid.Size.X * Grid.Size.Y; i++)
+	switch (DisplayType)
 	{
-		const int index = i * 4;
-		const int fire = Grid.Grid[i];
-		if (fire <= 0)
+	case ETextureDisplayType::Fire:
+		for (int i = 0; i < Grid.Size.X * Grid.Size.Y; i++)
 		{
-			RawImageData[index] = 0;
-			RawImageData[index + 1] = 0;
-			RawImageData[index + 2] = 255;
-			RawImageData[index + 3] = 255;
-		} else
-		{
-			RawImageData[index] = 0;
-			RawImageData[index + 1] = 0;
-			RawImageData[index + 2] = 0;
-			RawImageData[index + 3] = 255;
+			const int index = i * 4;
+			const int fire = Grid.Grid[i];
+			if (fire <= 0)
+			{
+				RawImageData[index] = 0;
+				RawImageData[index + 1] = 0;
+				RawImageData[index + 2] = 255;
+				RawImageData[index + 3] = 255;
+			}
+			else
+			{
+				RawImageData[index] = 0;
+				RawImageData[index + 1] = 0;
+				RawImageData[index + 2] = 0;
+				RawImageData[index + 3] = 255;
+			}
 		}
+		break;
+
+	case ETextureDisplayType::DistanceField:
+		for (int i = 0; i < Grid.Size.X * Grid.Size.Y; i++)
+		{
+			const int index = i * 4;
+			const int fire = Grid.Grid[i];
+			const int distance_norm = (fire - min) / (max - min) * 255;
+			if (fire < 0)
+			{
+				RawImageData[index] = 0;
+				RawImageData[index + 1] = 0;
+				RawImageData[index + 2] = 255;
+				RawImageData[index + 3] = 255;
+			}
+			else
+			{
+				RawImageData[index] = 0;
+				RawImageData[index + 1] = distance_norm;
+				RawImageData[index + 2] = 0;
+				RawImageData[index + 3] = 255;
+			}
+		}
+		break;
 	}
-	
+
+
 	//release the lock
 	ImageData->Unlock();
 	FireTexture->UpdateResource();
 }
-

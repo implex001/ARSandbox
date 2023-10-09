@@ -17,6 +17,13 @@ struct SANDBOX_API BoundsProbe
 	double grid_y_plus;
 };
 
+UENUM()
+enum class ETextureDisplayType : uint8
+{
+	Fire,
+	DistanceField
+};
+
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class SANDBOX_API UFireSimComponent : public UActorComponent
 {
@@ -43,6 +50,9 @@ public:
 	
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
 	UTexture2D* FireTexture;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	ETextureDisplayType DisplayType;
 
 protected:
 	// Called when the game starts

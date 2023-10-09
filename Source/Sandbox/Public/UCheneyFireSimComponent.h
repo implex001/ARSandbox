@@ -61,7 +61,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	double gradient_multiplier;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(BlueprintReadWrite, VisibleAnywhere)
 	UKinectDevice* KinectDevice;
 	
 	virtual double GetSpeed(FGrid<double>& Grid, FIntVector2 Coordinate, FVector2d AdvectNormalVector) override;
