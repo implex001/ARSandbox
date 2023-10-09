@@ -1,10 +1,22 @@
 ﻿#include "UCheneyFireSimComponent.h"
 
-#include "GeometryScript/TextureMapFunctions.h"
+#include "KinectDevice.h"
+
+#if WITH_OPENCV
+#include <vector>
+
+#include "PreOpenCVHeaders.h"
+
+#include "opencv2/calib3d.hpp"
+#include "opencv2/imgproc.hpp"
+
+#include "PostOpenCVHeaders.h"
+
+#endif	// WITH_OPENCV
 
 UCheneyFireSimComponent::UCheneyFireSimComponent()
 {
-	PrimaryComponentTick.bCanEverTick = false;
+	PrimaryComponentTick.bCanEverTick = true;
 }
 
 void UCheneyFireSimComponent::BeginPlay()
@@ -17,21 +29,38 @@ void UCheneyFireSimComponent::TickComponent(float DeltaTime, ELevelTick TickType
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	if (DepthTexture != nullptr)
+	if (KinectDevice == nullptr || DebugTexture == nullptr)
 	{
-		for(int i = 0; i < SimSize.X; i++)
+		return;
+	}
+
+	const int DepthGridInputXSize = KinectDevice->Width;
+	const int DepthGridInputYSize = KinectDevice->Height;
+	
+	cv::Mat TempDepthArray(cv::Size(DepthGridInputXSize, DepthGridInputYSize), CV_32SC1, KinectDevice->DepthData.GetData());
+	cv::Mat DepthMat(cv::Size(SimSize.X, SimSize.Y), CV_32SC1, DepthGrid.GetData());
+	cv::resize(TempDepthArray, DepthMat, DepthMat.size(), 0, 0, cv::INTER_NEAREST );
+	cv::flip(DepthMat, DepthMat, 1);
+
+	FTexturePlatformData* platformData = DebugTexture->GetPlatformData();
+	FTexture2DMipMap* MipMap = &platformData->Mips[0];
+	FByteBulkData* ImageData = &MipMap->BulkData;
+	uint8* RawImageData = (uint8*)ImageData->Lock(LOCK_READ_WRITE);
+
+	for(int i = 0; i < SimSize.X; i++)
+	{
+		for(int j = 0; j < SimSize.Y; j++)
 		{
-			for(int j = 0; j < SimSize.Y; j++)
-			{
-				FGeometryScriptUVList UVList = FGeometryScriptUVList();
-				UVList.List->Add(FVector2D(i, j));
-				FGeometryScriptSampleTextureOptions Options = FGeometryScriptSampleTextureOptions();
-				FGeometryScriptColorList ColorList = FGeometryScriptColorList();
-				UGeometryScriptLibrary_TextureMapFunctions::SampleTexture2DAtUVPositions(UVList, DepthTexture, Options, ColorList);
-				DepthGrid[i * SimSize.Y + j] = ColorList.List->operator[](0).A;
-			}
+			RawImageData[4 * (j * SimSize.Y+ i)] = DepthGrid[j * SimSize.Y + i];		// b
+			RawImageData[4 * (j * SimSize.Y+ i) + 1] = DepthGrid[j * SimSize.Y + i];	// G
+			RawImageData[4 * (j * SimSize.Y + i) + 2] = DepthGrid[j * SimSize.Y + i];	// r
+			RawImageData[4 * (j * SimSize.Y + i) + 3] = 255;
 		}
 	}
+
+	//release the lock
+	ImageData->Unlock();
+	DebugTexture->UpdateResource();
 }
 
 void UCheneyFireSimComponent::DefaultSetUp(FVector2D wind, EChenySubclass Subclass, double Temp, double Humidity, double curing, FVector2D size)
@@ -42,7 +71,9 @@ void UCheneyFireSimComponent::DefaultSetUp(FVector2D wind, EChenySubclass Subcla
 
 	CuringGrid.Init(curing, size.X * size.Y);
 	SubclassGrid.Init(Subclass, size.X * size.Y);
-	DepthGrid.Init(0, size.X * size.Y);
+	DepthGrid.Init(0, size.X*size.Y);
+	NormalGrid.Init(0, size.X*size.Y);
+	DebugTexture = UTexture2D::CreateTransient(size.X, size.Y);
 
 	SimSize = FIntVector2(size.X, size.Y);
 }
@@ -190,7 +221,7 @@ double UCheneyFireSimComponent::GetSpeed(FGrid<double>& Grid, FIntVector2 Coordi
 	double speed = head_speed * speed_fraction;
 
 	FVector2d gradient_elevation = CalculateGradient(DepthGrid, Coordinate, Grid.Size);
-	double slope_in_normal = atan(FVector2d::DotProduct(AdvectNormalVector, gradient_elevation));
+	double slope_in_normal = atan(FVector2d::DotProduct(AdvectNormalVector, gradient_elevation)) * 180 / PI;
 	slope_in_normal = FMath::Min(FMath::Max(slope_in_normal, -20), 20);
 	double slope_cooefficient = FMath::Exp(0.069 * slope_in_normal);
 	return speed * slope_cooefficient;
@@ -198,47 +229,47 @@ double UCheneyFireSimComponent::GetSpeed(FGrid<double>& Grid, FIntVector2 Coordi
 
 FVector2D UCheneyFireSimComponent::CalculateGradient(TArray<int>& Grid, FIntVector2 Coordinate, FIntVector2 Bounds)
 {
-	int x = Coordinate.X;
 	int y = Coordinate.Y;
+	int x = Coordinate.X;
 
 	double grid_x_minus;
 	double grid_x_plus;
 	double grid_y_minus;
 	double grid_y_plus;
 	
-	if (x == 0)
-	{
-		grid_x_minus = Grid[x * Bounds.Y + y];
-	} else
-	{
-		grid_x_minus = Grid[(x - 1) * Bounds.Y + y];
-	}
-
-	if (x == Bounds.X - 1)
-	{
-		grid_x_plus = Grid[x * Bounds.Y + y];
-	}
-	else
-	{
-		grid_x_plus = Grid[(x + 1) * Bounds.Y + y];
-	}
-
 	if (y == 0)
 	{
-		grid_y_minus = Grid[x * Bounds.Y + y];
-	}
-	else
+		grid_x_minus = Grid[y * Bounds.Y + x];
+	} else
 	{
-		grid_y_minus = Grid[x * Bounds.Y + (y - 1)];
+		grid_x_minus = Grid[(y - 1) * Bounds.Y + x];
 	}
 
 	if (y == Bounds.Y - 1)
 	{
-		grid_y_plus = Grid[x * Bounds.Y + y];
+		grid_x_plus = Grid[y * Bounds.Y + x];
 	}
 	else
 	{
-		grid_y_plus = Grid[x * Bounds.Y + (y + 1)];
+		grid_x_plus = Grid[(y + 1) * Bounds.Y + x];
+	}
+
+	if (x == 0)
+	{
+		grid_y_minus = Grid[y * Bounds.Y + x];
+	}
+	else
+	{
+		grid_y_minus = Grid[y * Bounds.Y + (x - 1)];
+	}
+
+	if (x == Bounds.X - 1)
+	{
+		grid_y_plus = Grid[y * Bounds.Y + x];
+	}
+	else
+	{
+		grid_y_plus = Grid[y * Bounds.Y + (x + 1)];
 	}
 
 	double grid_x = (grid_x_plus - grid_x_minus);

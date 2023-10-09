@@ -27,9 +27,8 @@ void AControlWindowActor::BeginPlay()
 		.ClientSize(FVector2D(900, 800))
 		.CreateTitleBar(true)
 		.SizingRule(ESizingRule::UserSized)
-		.SupportsMaximize(false)
-		.SupportsMinimize(true)
-		.HasCloseButton(true);
+		.SupportsMaximize(true)
+		.SupportsMinimize(true);
 
 	FGeometry WindowGeometry = Window->GetWindowGeometryInScreen();
 

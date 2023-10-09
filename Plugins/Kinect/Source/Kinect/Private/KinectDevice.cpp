@@ -292,7 +292,7 @@ void UKinectDevice::ProcessDepth(UINT16* buffer, UINT size)
 		{
 			Depth = static_cast<uint16>(max);
 		}
-		DepthData[i] = static_cast<int>((Depth - min) / (max - min));
+		DepthData[i] = 255 - static_cast<uint8>((Depth - min) / (max - min) * 255);
 
 		uint8 Intensity = 255 - static_cast<uint8>((Depth - min) / (max - min) * 255);
 		if (Intensity == 74)

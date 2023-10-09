@@ -33,12 +33,12 @@ struct SANDBOX_API FGrid
 
 	FORCEINLINE T& operator[](FIntVector2 vector)
 	{
-		return Grid[vector.X * Size.Y + vector.Y];
+		return Grid[vector.Y * Size.Y + vector.X];
 	}
 
 	FORCEINLINE T& Get(int x, int y)
 	{
-		return Grid[x * Size.Y + y];
+		return Grid[y * Size.Y + x];
 	}
 	
 

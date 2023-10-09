@@ -194,26 +194,22 @@ void UFireSimComponent::ConvertToTexture(FGrid<double>& Grid)
 	FByteBulkData* ImageData = &MipMap->BulkData;
 	uint8* RawImageData = (uint8*)ImageData->Lock(LOCK_READ_WRITE);
 
-	for (int i = 0; i < Grid.Size.X; i++)
+	for (int i = 0; i < Grid.Size.X * Grid.Size.Y; i++)
 	{
-		for (int j = 0; j < Grid.Size.Y; j++)
+		const int index = i * 4;
+		const int fire = Grid.Grid[i];
+		if (fire <= 0)
 		{
-			const int index = (j * Grid.Size.X + i) * 4;
-			const double fire = Grid.Get(i,j);
-			if (fire <= 0)
-			{
-				RawImageData[index] = 0;
-				RawImageData[index + 1] = 0;
-				RawImageData[index + 2] = 255;
-				RawImageData[index + 3] = 255;
-			} else
-			{
-				RawImageData[index] = 0;
-				RawImageData[index + 1] = 0;
-				RawImageData[index + 2] = 0;
-				RawImageData[index + 3] = 255;
-			}
-
+			RawImageData[index] = 0;
+			RawImageData[index + 1] = 0;
+			RawImageData[index + 2] = 255;
+			RawImageData[index + 3] = 255;
+		} else
+		{
+			RawImageData[index] = 0;
+			RawImageData[index + 1] = 0;
+			RawImageData[index + 2] = 0;
+			RawImageData[index + 3] = 255;
 		}
 	}
 	

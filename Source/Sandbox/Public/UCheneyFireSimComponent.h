@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "UBasicFireSimComponent.h"
 #include "FGrid.h"
+#include "KinectDevice.h"
 #include "UCheneyFireSimComponent.Generated.h"
 
 UENUM()
@@ -42,6 +43,9 @@ public:
 	UPROPERTY(BlueprintReadWrite)
 	TArray<int> DepthGrid;
 
+	UPROPERTY(BlueprintReadWrite)
+	TArray<float> NormalGrid;
+
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	double temperature;
 
@@ -50,6 +54,15 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	UTexture2D* DepthTexture;
+
+	UPROPERTY(BlueprintReadWrite, VisibleAnywhere)
+	UTexture2D* DebugTexture;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	double gradient_multiplier;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UKinectDevice* KinectDevice;
 	
 	virtual double GetSpeed(FGrid<double>& Grid, FIntVector2 Coordinate, FVector2d AdvectNormalVector) override;
 
