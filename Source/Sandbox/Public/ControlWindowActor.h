@@ -19,6 +19,12 @@ public:
 	UUserWidget* UserWidget;
 	
 	TSharedPtr<SWindow> Window;
+
+	UFUNCTION(BlueprintCallable)
+	void GetWindowPosition(FVector2D& Position);
+
+	UFUNCTION(BlueprintCallable)
+	void SetWindowPosition(FVector2D Position);
 	
 protected:
 	// Called when the game starts or when spawned

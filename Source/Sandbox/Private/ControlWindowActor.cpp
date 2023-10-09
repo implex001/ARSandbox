@@ -24,11 +24,12 @@ void AControlWindowActor::BeginPlay()
 		.Title(FText::FromString(TEXT("Control Window")))
 		.IsInitiallyMaximized(false)
 		.ScreenPosition(FVector2D(0, 0))
-		.ClientSize(FVector2D(900, 800))
+		.ClientSize(FVector2D(1200, 800))
 		.CreateTitleBar(true)
 		.SizingRule(ESizingRule::UserSized)
 		.SupportsMaximize(true)
-		.SupportsMinimize(true);
+		.SupportsMinimize(true)
+		.FocusWhenFirstShown(true);
 
 	FGeometry WindowGeometry = Window->GetWindowGeometryInScreen();
 
@@ -77,5 +78,21 @@ void AControlWindowActor::OnWindowClose(const TSharedRef<SWindow>& EventWindow)
 void AControlWindowActor::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+}
+
+void AControlWindowActor::GetWindowPosition(FVector2D& Position)
+{
+	if (Window.IsValid())
+	{
+		Position = Window->GetPositionInScreen();
+	}
+}
+
+void AControlWindowActor::SetWindowPosition(FVector2D Position)
+{
+	if (Window.IsValid())
+	{
+		Window->MoveWindowTo(Position);
+	}
 }
 
