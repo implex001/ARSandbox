@@ -53,6 +53,8 @@ void UFireSimComponent::ResetSimulation()
 {
 	PhiGrid = FGrid<double>(0, SimulationSize.X, SimulationSize.Y);
 	TempPhiGrid = FGrid<double>(0, SimulationSize.X, SimulationSize.Y);
+	FireStateGrid = FGrid<EFireState>(EFireState::Unburned, SimulationSize.X, SimulationSize.Y);
+	BurnTimeGrid = FGrid<int>(BurnTime, SimulationSize.X, SimulationSize.Y);
 	InitDistanceGrid(PhiGrid);
 	ConvertToTexture(PhiGrid);
 }
@@ -60,6 +62,24 @@ void UFireSimComponent::ResetSimulation()
 
 void UFireSimComponent::InitDistanceGrid(FGrid<double>& Grid)
 {
+	Grid = FGrid<double>(FMath::Sqrt(SimulationSize.X * SimulationSize.Y), SimulationSize.X, SimulationSize.Y);
+	for (auto Element : InterfaceLocations)
+	{
+		FireStateGrid.Get(Element.X, Element.Y) = EFireState::Burning;
+		Grid.Get(Element.X, Element.Y) = -1;
+	}
+
+	for (int i = 0; i < Grid.Size.X; i++)
+	{
+		for (int j = 0; j < Grid.Size.Y; j++)
+		{
+			if (FireStateGrid.Get(i, j) != EFireState::Unburned)
+			{
+				Grid.Get(i,j) = -1;
+			} 
+		}
+	}
+
 	int error = INT_MAX;
 	while (error > SteadyThreshold)
 	{
@@ -69,7 +89,7 @@ void UFireSimComponent::InitDistanceGrid(FGrid<double>& Grid)
 		{
 			for (int j = 0; j < Grid.Size.Y; j++)
 			{
-				if (Grid.Get(i, j) < 0 || InterfaceLocations.Contains(FVector2D(i, j)))
+				if (FireStateGrid.Get(i, j) != EFireState::Unburned)
 					continue;
 
 				double difference = CellInitStep(TempPhiGrid, FIntVector2(i, j));
@@ -87,7 +107,31 @@ void UFireSimComponent::TimeStep(FGrid<double>& Grid)
 	{
 		for (int j = 0; j < Grid.Size.Y; j++)
 		{
-			Grid.Get(i, j) = CellTimeStep(TempPhiGrid, FIntVector2(i, j), SimStepSize);
+			double newDistance = CellTimeStep(TempPhiGrid, FIntVector2(i, j), SimStepSize);
+			EFireState fireState = FireStateGrid.Get(i, j);
+			Grid.Get(i, j) = newDistance;
+			if (newDistance > 0 || fireState == EFireState::Burned)
+			{
+				continue;
+			}
+
+			if (fireState == EFireState::Burning)
+			{
+				BurnTimeGrid.Get(i, j) -= 1;
+				if (BurnTimeGrid.Get(i, j) <= 0)
+				{
+					FireStateGrid.Get(i, j) = EFireState::Burned;
+				}
+				continue;
+			}
+
+			BoundsProbe probe = ProbeBounds(FireStateGrid, FIntVector2(i, j));
+			
+			if (probe.grid_x_minus == EFireState::Burning || probe.grid_x_plus == EFireState::Burning ||
+				probe.grid_y_minus == EFireState::Burning || probe.grid_y_plus == EFireState::Burning)
+			{
+				FireStateGrid.Get(i, j) = EFireState::Burning;
+			}
 		}
 	}
 }
@@ -146,11 +190,12 @@ FVector2d UFireSimComponent::NormalizePhi(FGrid<double>& Grid, FIntVector2 Coord
 	return FVector2D(gradient.X / magnitude, gradient.Y / magnitude);
 }
 
-BoundsProbe UFireSimComponent::ProbeBounds(FGrid<double>& Grid, FIntVector2 Coordinate)
+template<class T>
+BoundsProbe<T> UFireSimComponent::ProbeBounds(FGrid<T>& Grid, FIntVector2 Coordinate)
 {
 	int x = Coordinate.X;
 	int y = Coordinate.Y;
-	BoundsProbe probe;
+	BoundsProbe<T> probe;
 
 	if (x == 0)
 	{
@@ -205,20 +250,28 @@ void UFireSimComponent::ConvertToTexture(FGrid<double>& Grid)
 		for (int i = 0; i < Grid.Size.X * Grid.Size.Y; i++)
 		{
 			const int index = i * 4;
-			const int fire = Grid.Grid[i];
-			if (fire <= 0)
+			const EFireState fire = FireStateGrid.Grid[i];
+
+			switch (fire)
 			{
+			case EFireState::Burning:
 				RawImageData[index] = 0;
 				RawImageData[index + 1] = 0;
 				RawImageData[index + 2] = 255;
 				RawImageData[index + 3] = 255;
-			}
-			else
-			{
+				break;
+			case EFireState::Burned:
 				RawImageData[index] = 0;
 				RawImageData[index + 1] = 0;
 				RawImageData[index + 2] = 0;
 				RawImageData[index + 3] = 255;
+				break;
+			case EFireState::Unburned:
+				RawImageData[index] = 50;
+				RawImageData[index + 1] = 50;
+				RawImageData[index + 2] = 50;
+				RawImageData[index + 3] = 255;
+				break;
 			}
 		}
 		break;
@@ -228,8 +281,9 @@ void UFireSimComponent::ConvertToTexture(FGrid<double>& Grid)
 		{
 			const int index = i * 4;
 			const int fire = Grid.Grid[i];
-			const int distance_norm = (fire - min) / (max - min) * 255;
-			if (fire < 0)
+			const int distance_norm = (FMath::Abs(fire) - 0) / (max - 0) * 255;
+			const int distance_norm_min = (FMath::Abs(fire) - 0) / (FMath::Abs(min) - 0) * 255;
+			if (fire <= 0)
 			{
 				RawImageData[index] = 0;
 				RawImageData[index + 1] = 0;

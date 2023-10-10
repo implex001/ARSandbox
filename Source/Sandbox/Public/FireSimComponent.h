@@ -9,12 +9,13 @@
 
 #include "FireSimComponent.generated.h"
 
+template<class T>
 struct SANDBOX_API BoundsProbe
 {
-	double grid_x_minus;
-	double grid_x_plus;
-	double grid_y_minus;
-	double grid_y_plus;
+	T grid_x_minus;
+	T grid_x_plus;
+	T grid_y_minus;
+	T grid_y_plus;
 };
 
 UENUM()
@@ -22,6 +23,14 @@ enum class ETextureDisplayType : uint8
 {
 	Fire,
 	DistanceField
+};
+
+UENUM()
+enum class EFireState : uint8
+{
+	Unburned,
+	Burning,
+	Burned
 };
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
@@ -54,6 +63,9 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	ETextureDisplayType DisplayType;
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	int BurnTime;
+
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
@@ -71,9 +83,12 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void ResetSimulation();
 private:
-	const float SteadyThreshold = 0.01f;
+	const float SteadyThreshold = 0.005f;
 	FGrid<double> PhiGrid;
 	FGrid<double> TempPhiGrid;
+
+	FGrid<EFireState> FireStateGrid;
+	FGrid<int> BurnTimeGrid;
 
 	int Time;
 
@@ -89,7 +104,9 @@ public:
 	static FVector2d GradientPhi(FGrid<double>& Grid, FIntVector2 Coordinate, double Unit = 1);
 	static double MagnitudePhi(FGrid<double>& Grid, FIntVector2 Coordinate, double Unit = 1);
 	static FVector2d NormalizePhi(FGrid<double>& Grid, FIntVector2 Coordinate, double Unit = 1);
-	static BoundsProbe ProbeBounds(FGrid<double>& Grid, FIntVector2 Coordinate);
+
+	template<class T>
+	static BoundsProbe<T> ProbeBounds(FGrid<T>& Grid, FIntVector2 Coordinate);
 };
 
 
