@@ -55,6 +55,7 @@ void UFireSimComponent::ResetSimulation()
 	TempPhiGrid = FGrid<double>(0, SimulationSize.X, SimulationSize.Y);
 	FireStateGrid = FGrid<EFireState>(EFireState::Unburned, SimulationSize.X, SimulationSize.Y);
 	BurnTimeGrid = FGrid<int>(BurnTime, SimulationSize.X, SimulationSize.Y);
+	AdaptiveErrorCount = 0;
 	InitDistanceGrid(PhiGrid);
 	ConvertToTexture(PhiGrid);
 }
@@ -134,13 +135,16 @@ void UFireSimComponent::TimeStep(FGrid<double>& Grid)
 				continue;
 			}
 
-			// Distance cell negative out of order, reinitialise distance field
-			if (AdaptiveReinitialize)
+			// Distance cell negative out of order, reinitialise distance field if above error count
+			if (AdaptiveReinitialize && AdaptiveErrorCount >= AdaptiveErrorTolerance)
 			{
+				AdaptiveErrorCount = 0;
 				Grid = TempPhiGrid;
 				InitDistanceGrid(Grid);
 				return;
 			}
+
+			AdaptiveErrorCount++;
 		}
 	}
 }

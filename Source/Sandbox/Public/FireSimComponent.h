@@ -69,6 +69,9 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	bool AdaptiveReinitialize;
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	int AdaptiveErrorTolerance = 1;
+
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
@@ -94,6 +97,8 @@ private:
 	FGrid<int> BurnTimeGrid;
 
 	int Time;
+
+	int AdaptiveErrorCount = 0;
 
 	void InitDistanceGrid(FGrid<double>& Grid);
 	void TimeStep(FGrid<double>& Grid);
