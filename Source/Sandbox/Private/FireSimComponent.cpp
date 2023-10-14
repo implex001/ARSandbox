@@ -35,7 +35,7 @@ void UFireSimComponent::TickComponent(float DeltaTime, ELevelTick TickType,
 void UFireSimComponent::StepSimulation()
 {
 	Time++;
-	if (Time % ReInitializeStep == 0)
+	if (ReInitializeStep > 0 && Time % ReInitializeStep == 0)
 	{
 		InitDistanceGrid(PhiGrid);
 	}
@@ -131,6 +131,15 @@ void UFireSimComponent::TimeStep(FGrid<double>& Grid)
 				probe.grid_y_minus == EFireState::Burning || probe.grid_y_plus == EFireState::Burning)
 			{
 				FireStateGrid.Get(i, j) = EFireState::Burning;
+				continue;
+			}
+
+			// Distance cell negative out of order, reinitialise distance field
+			if (AdaptiveReinitialize)
+			{
+				Grid = TempPhiGrid;
+				InitDistanceGrid(Grid);
+				return;
 			}
 		}
 	}

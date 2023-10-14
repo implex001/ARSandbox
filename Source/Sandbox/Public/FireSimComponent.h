@@ -66,6 +66,9 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	int BurnTime;
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	bool AdaptiveReinitialize;
+
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
