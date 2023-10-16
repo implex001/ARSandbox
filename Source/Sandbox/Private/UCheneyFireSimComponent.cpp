@@ -42,6 +42,10 @@ void UCheneyFireSimComponent::TickComponent(float DeltaTime, ELevelTick TickType
 	cv::resize(TempDepthArray, DepthMat, DepthMat.size(), 0, 0, cv::INTER_NEAREST );
 	cv::flip(DepthMat, DepthMat, 1);
 
+	//Apply min max to NormalGrid
+	double max = FGenericPlatformMath::Max(NormalGrid);
+	double min = FGenericPlatformMath::Min(NormalGrid);
+	// Debug Texture
 	FTexturePlatformData* platformData = DebugTexture->GetPlatformData();
 	FTexture2DMipMap* MipMap = &platformData->Mips[0];
 	FByteBulkData* ImageData = &MipMap->BulkData;
@@ -51,9 +55,10 @@ void UCheneyFireSimComponent::TickComponent(float DeltaTime, ELevelTick TickType
 	{
 		for(int j = 0; j < SimSize.Y; j++)
 		{
-			RawImageData[4 * (j * SimSize.Y+ i)] = DepthGrid[j * SimSize.Y + i];		// b
+			double value = (NormalGrid[j * SimSize.Y + i] - min) / (max-min) * 255;
+			RawImageData[4 * (j * SimSize.Y+ i)] = value;		// b
 			RawImageData[4 * (j * SimSize.Y+ i) + 1] = DepthGrid[j * SimSize.Y + i];	// G
-			RawImageData[4 * (j * SimSize.Y + i) + 2] = DepthGrid[j * SimSize.Y + i];	// r
+			RawImageData[4 * (j * SimSize.Y + i) + 2] = value;	// r
 			RawImageData[4 * (j * SimSize.Y + i) + 3] = 255;
 		}
 	}
@@ -223,8 +228,10 @@ double UCheneyFireSimComponent::GetSpeed(FGrid<double>& Grid, FIntVector2 Coordi
 	FVector2d gradient_elevation = CalculateGradient(DepthGrid, Coordinate, Grid.Size);
 	double slope_in_normal = atan(FVector2d::DotProduct(AdvectNormalVector, gradient_elevation)) * 180 / PI;
 	slope_in_normal = FMath::Min(FMath::Max(slope_in_normal, -20), 20);
-	double slope_cooefficient = FMath::Exp(0.069 * slope_in_normal);
-	return speed * slope_cooefficient;
+	double slope_cooefficient = FMath::Exp(0.069 * slope_in_normal) * gradient_multiplier;
+	const double total_speed = speed * slope_cooefficient;
+	NormalGrid[Coordinate.Y * Grid.Size.Y + Coordinate.X] = slope_cooefficient;
+	return total_speed;
 }
 
 FVector2D UCheneyFireSimComponent::CalculateGradient(TArray<int>& Grid, FIntVector2 Coordinate, FIntVector2 Bounds)
@@ -274,5 +281,5 @@ FVector2D UCheneyFireSimComponent::CalculateGradient(TArray<int>& Grid, FIntVect
 
 	double grid_x = (grid_x_plus - grid_x_minus);
 	double grid_y = (grid_y_plus - grid_y_minus);
-	return FVector2D(grid_x, grid_y);
+	return FVector2D(grid_y, grid_x);
 }
