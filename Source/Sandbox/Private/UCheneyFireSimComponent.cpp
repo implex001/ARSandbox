@@ -225,12 +225,16 @@ double UCheneyFireSimComponent::GetSpeed(FGrid<double>& Grid, FIntVector2 Coordi
 	// Adjust for calculated speed coefficient for fire flanks
 	double speed = head_speed * speed_fraction;
 
-	FVector2d gradient_elevation = CalculateGradient(DepthGrid, Coordinate, Grid.Size);
-	double slope_in_normal = atan(FVector2d::DotProduct(AdvectNormalVector, gradient_elevation)) * 180 / PI;
-	slope_in_normal = FMath::Min(FMath::Max(slope_in_normal, -20), 20);
-	double slope_cooefficient = FMath::Exp(0.069 * slope_in_normal) * gradient_multiplier;
-	const double total_speed = speed * slope_cooefficient;
-	NormalGrid[Coordinate.Y * Grid.Size.Y + Coordinate.X] = slope_cooefficient;
+	double slope_coefficient = 1;
+	if (gradient_multiplier != 0)
+	{
+		FVector2d gradient_elevation = CalculateGradient(DepthGrid, Coordinate, Grid.Size);
+		double slope_in_normal = atan(FVector2d::DotProduct(AdvectNormalVector, gradient_elevation)) * 180 / PI;
+		slope_in_normal = FMath::Min(FMath::Max(slope_in_normal, -20), 20);
+		slope_coefficient = FMath::Exp(0.069 * slope_in_normal) * gradient_multiplier;
+	}
+	const double total_speed = speed * slope_coefficient;
+	NormalGrid[Coordinate.Y * Grid.Size.Y + Coordinate.X] = slope_coefficient;
 	return total_speed;
 }
 

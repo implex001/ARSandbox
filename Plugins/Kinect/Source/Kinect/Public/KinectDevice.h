@@ -44,6 +44,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="IO")
 	void Shutdown();
 
+	UFUNCTION(BlueprintCallable)
+	void ResetFilter();
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	double MinDepthDistance = 0;
 

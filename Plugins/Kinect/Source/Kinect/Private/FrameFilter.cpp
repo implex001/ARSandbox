@@ -224,23 +224,7 @@ FrameFilter::FrameFilter(const unsigned int sSize[2],unsigned int sNumAveragingS
 	/* Initialize the valid depth range: */
 	setValidDepthInterval(0U,2046U);
 	
-	/* Initialize the averaging buffer: */
 	numAveragingSlots=sNumAveragingSlots;
-	averagingBuffer=new RawDepth[numAveragingSlots*size[1]*size[0]];
-	RawDepth* abPtr=averagingBuffer;
-	for(unsigned int i=0;i<numAveragingSlots;++i)
-		for(unsigned int y=0;y<size[1];++y)
-			for(unsigned int x=0;x<size[0];++x,++abPtr)
-				*abPtr=2048U; // Mark sample as invalid
-	averagingSlotIndex=0U;
-	
-	/* Initialize the statistics buffer: */
-	statBuffer=new unsigned int[size[1]*size[0]*3];
-	unsigned int* sbPtr=statBuffer;
-	for(unsigned int y=0;y<size[1];++y)
-		for(unsigned int x=0;x<size[0];++x)
-			for(int i=0;i<3;++i,++sbPtr)
-				*sbPtr=0;
 	
 	/* Initialize the stability criterion: */
 	minNumSamples=(numAveragingSlots+1)/2;
@@ -257,14 +241,8 @@ FrameFilter::FrameFilter(const unsigned int sSize[2],unsigned int sNumAveragingS
 	// basePlaneCc[3]=-basePlane.getOffset();
 	// PTransform::HVector basePlaneDic(depthProjection.getMatrix().transposeMultiply(basePlaneCc));
 	// basePlaneDic/=Geometry::mag(basePlaneDic.toVector());
-	
-	/* Initialize the valid buffer: */
-	validBuffer=new float[size[1]*size[0]];
-	float* vbPtr=validBuffer;
-	for(unsigned int y=0;y<size[1];++y)
-		for(unsigned int x=0;x<size[0];++x,++vbPtr)
-			//*vbPtr=float(-((double(x)+0.5)*basePlaneDic[0]+(double(y)+0.5)*basePlaneDic[1]+basePlaneDic[3])/basePlaneDic[2]);
-			*vbPtr=float(-((double(x)+0.5)*0+(double(y)+0.5)*0+1)/1);
+
+	resetFilter();
 	
 	/* Initialize the output frame buffer: */
 	for(int i=0;i<3;++i)
@@ -291,6 +269,33 @@ FrameFilter::~FrameFilter(void)
 	delete[] validBuffer;
 	//delete outputFrameFunction;
 	}
+
+void FrameFilter::resetFilter()
+{
+	/* Initialize the averaging buffer: */
+	averagingBuffer=new RawDepth[numAveragingSlots*size[1]*size[0]];
+	RawDepth* abPtr=averagingBuffer;
+	for(unsigned int i=0;i<numAveragingSlots;++i)
+		for(unsigned int y=0;y<size[1];++y)
+			for(unsigned int x=0;x<size[0];++x,++abPtr)
+				*abPtr=2048U; // Mark sample as invalid
+	averagingSlotIndex=0U;
+	
+	/* Initialize the statistics buffer: */
+	statBuffer=new unsigned int[size[1]*size[0]*3];
+	unsigned int* sbPtr=statBuffer;
+	for(unsigned int y=0;y<size[1];++y)
+		for(unsigned int x=0;x<size[0];++x)
+			for(int i=0;i<3;++i,++sbPtr)
+				*sbPtr=0;
+
+	validBuffer=new float[size[1]*size[0]];
+	float* vbPtr=validBuffer;
+	for(unsigned int y=0;y<size[1];++y)
+		for(unsigned int x=0;x<size[0];++x,++vbPtr)
+			//*vbPtr=float(-((double(x)+0.5)*basePlaneDic[0]+(double(y)+0.5)*basePlaneDic[1]+basePlaneDic[3])/basePlaneDic[2]);
+			*vbPtr=float(-((double(x)+0.5)*0+(double(y)+0.5)*0+1)/1);
+}
 
 void FrameFilter::setValidDepthInterval(unsigned int newMinDepth,unsigned int newMaxDepth)
 	{

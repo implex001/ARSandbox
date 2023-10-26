@@ -462,6 +462,11 @@ void UKinectDevice::UpdateTextureRegion(FTextureRHIRef TextureRHI, int32 MipInde
 		});
 }
 
+void UKinectDevice::ResetFilter()
+{
+	Filter->resetFilter();
+}
+
 
 void UpdateIntrinsics(NUI_FUSION_IMAGE_FRAME * pImageFrame, NUI_FUSION_CAMERA_PARAMETERS * params)
 {

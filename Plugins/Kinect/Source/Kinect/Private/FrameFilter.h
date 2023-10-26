@@ -90,4 +90,5 @@ public:
 		{
 		return outputFrames.getLockedValue();
 		}
+	void resetFilter();
 	};
